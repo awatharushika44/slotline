@@ -1,48 +1,15 @@
-\# Slotline — Technical Decisions
+## Phase 2: Database Design
 
-
-
-\## Phase 0 additions: Edge cases
-
-
-
-| Decision                            | Chosen                                                                      | Rejected                      | Why                                                                                                 |
-
-| ----------------------------------- | --------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------- |
-
-| Editing a reservation (BR11)        | Same overlap rule, excluding itself                                         | Skip check on edit            | Edits must never create overlaps; self-overlap must not block the edit                              |
-
-| Ended / in-progress bookings (BR12) | Ended = read-only; in progress = start locked, end editable, cancel allowed | Allow all edits anytime       | History must stay trustworthy. Trade-off: cancel of in-progress booking hides real usage from stats |
-
-| Midnight crossing (BR13)            | One range of instants, clipped per day in the UI                            | Date + two times model        | Ranges map directly to `tstzrange` and make overlap math simple                                     |
-
-| Cancel/rebook race (BR14)           | Rely on DB constraint, no app locks                                         | Row locks / check-then-insert | Check-then-insert has a race window; the constraint is atomic. Cancel is idempotent                 |
-
-| Deactivated users (BR15)            | Deactivate, keep future bookings, flag for admin                            | Hard delete or auto-cancel    | Same principle as resources: never destroy history silently                                         |
-
-
-
-\## Phase 1: Setup and tooling
-
-
-
-| Decision         | Chosen                                                                          | Rejected                       | Why                                                                                                    |
-
-| ---------------- | ------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
-
-| ORM              | Drizzle                                                                         | Prisma                         | SQL stays visible; clean raw-SQL migrations for the exclusion constraint. Trade-off: smaller ecosystem |
-
-| Database runtime | Docker Compose, `postgres:16-alpine`                                            | Local install, `latest` tag    | Same setup for every developer; pinned major version                                                   |
-
-| Styling          | Tailwind CSS                                                                    | Plain CSS                      | Fast, consistent design tokens                                                                         |
-
-| Folder structure | `app` / `components` / `lib` {`validation`, `domain`, `services`, `db`, `time`} | Logic inside routes/components | Testable pure domain logic; clear dependency direction                                                 |
-
-| Git workflow     | Short branches, PRs to `main`, squash merge, Conventional Commits               | Direct pushes to `main`        | Clean, reviewable history                                                                              |
-
-| CI               | GitHub Actions: lint + typecheck now, tests in Phase 4                          | No CI                          | Automatic proof of quality on every push                                                               |
-
-| Secrets          | `.env` ignored, `.env.example` committed                                        | Committing real values         | Never commit secrets                                                                                   |
-
-
-
+| Decision                      | Chosen                                                                                                                                                              | Rejected                                          | Why                                                                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No-overlap rule               | PostgreSQL `EXCLUDE USING gist`, partial `WHERE status = 'active'`                                                                                                  | Check-then-insert in application code only        | Atomic enforcement prevents concurrent bookings from overlapping. Cancelled bookings are excluded from the constraint.                                                            |
+| Time storage                  | Two `timestamptz` columns, with a range constructed inside the constraint                                                                                           | A single `tstzrange` column                       | Simpler ORM integration, validation, and readability, at the cost of a slightly less elegant schema.                                                                              |
+| Interval semantics            | Half-open intervals: `[)`                                                                                                                                           | Closed intervals                                  | Allows back-to-back bookings without treating the shared boundary as an overlap.                                                                                                  |
+| Primary keys                  | UUIDs using `gen_random_uuid()`                                                                                                                                     | `serial` or `bigint`                              | Makes identifiers harder to guess. The trade-off is larger keys. The audit table uses a `bigint` identity for ordered log entries.                                                |
+| Category and status           | PostgreSQL ENUM types                                                                                                                                               | Lookup tables                                     | Simple and typo-resistant. Adding a new value requires a database migration.                                                                                                      |
+| Foreign keys                  | `ON DELETE RESTRICT`                                                                                                                                                | `ON DELETE CASCADE`                               | Prevents deleting records that have dependent history, supporting BR7 and BR15.                                                                                                   |
+| Audit details                 | JSONB `before` and `after` values                                                                                                                                   | A separate typed column for every possible change | Flexible for recording different changes, but less strictly typed.                                                                                                                |
+| Database enforcement boundary | Database enforces structure, overlap, `end > start`, foreign keys, and uniqueness                                                                                   | Enforcing every business rule in the database     | Application rules such as the 15-minute grid, maximum 8-hour duration, no past bookings, and active-resource checks can provide clearer validation errors and evolve more easily. |
+| Past bookings (BR5)           | Enforced in application logic                                                                                                                                       | A database `CHECK` constraint using `now()`       | Time-dependent `CHECK` constraints are unsuitable because their results can change over time and existing rows could become invalid.                                              |
+| Indexes                       | GiST index through the exclusion constraint; indexes on `(user_id, starts_at)`, `starts_at`, and audit events by reservation; unique email and unique `lower(name)` | Indexes on status and category                    | Supports expected queries and uniqueness requirements without adding indexes on low-cardinality columns that may offer little benefit on small tables.                            |
+| `password_hash` column        | Include in the initial schema                                                                                                                                       | Add in a later migration                          | Avoids an unnecessary follow-up migration. Confirm the authentication requirements before finalizing the schema.                                                                  |
