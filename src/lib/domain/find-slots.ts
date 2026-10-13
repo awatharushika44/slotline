@@ -1,4 +1,3 @@
-
 import { GRID_MINUTES } from "./booking-rules";
 import { getFreeIntervals, type TimeRange } from "./overlap";
 
@@ -24,7 +23,7 @@ export interface FindNextSlotsInput {
 /**
  * Rounds an instant UP to the next 15-minute grid line.
  */
-function ceilToGrid(date: Date): Date {
+export function ceilToGrid(date: Date): Date {
   const gridMs = GRID_MINUTES * MINUTE_MS;
 
   return new Date(
@@ -55,10 +54,7 @@ export function findNextSlots({
     );
   }
 
-  if (
-    !Number.isInteger(limit) ||
-    limit < 0
-  ) {
+  if (!Number.isInteger(limit) || limit < 0) {
     throw new RangeError("limit must be a non-negative integer.");
   }
 
@@ -101,4 +97,3 @@ export function findNextSlots({
     )
     .slice(0, limit);
 }
-

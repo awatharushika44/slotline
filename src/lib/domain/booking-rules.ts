@@ -1,4 +1,3 @@
-
 import type { TimeRange } from "./overlap";
 
 // The minimum booking is one grid step (15 minutes).
@@ -25,6 +24,7 @@ export interface RuleViolation {
 export function validateBookingWindow(
   range: TimeRange,
   now: Date,
+  options: { existingStart?: Date } = {},
 ): RuleViolation[] {
   const startMs = range.start.getTime();
   const endMs = range.end.getTime();
@@ -60,7 +60,11 @@ export function validateBookingWindow(
     });
   }
 
-  if (startMs < now.getTime()) {
+  // BR12: an existing booking may keep its original start time,
+  // even if that start time is now in the past.
+  const startUnchanged = options.existingStart?.getTime() === startMs;
+
+  if (!startUnchanged && startMs < now.getTime()) {
     violations.push({
       code: "START_IN_PAST",
       field: "startsAt",
