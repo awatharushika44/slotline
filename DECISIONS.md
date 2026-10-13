@@ -13,3 +13,13 @@
 | Past bookings (BR5)           | Enforced in application logic                                                                                                                                       | A database `CHECK` constraint using `now()`       | Time-dependent `CHECK` constraints are unsuitable because their results can change over time and existing rows could become invalid.                                              |
 | Indexes                       | GiST index through the exclusion constraint; indexes on `(user_id, starts_at)`, `starts_at`, and audit events by reservation; unique email and unique `lower(name)` | Indexes on status and category                    | Supports expected queries and uniqueness requirements without adding indexes on low-cardinality columns that may offer little benefit on small tables.                            |
 | `password_hash` column        | Include in the initial schema                                                                                                                                       | Add in a later migration                          | Avoids an unnecessary follow-up migration. Confirm the authentication requirements before finalizing the schema.                                                                  |
+## Phase 3: Migrations, seed, constraint
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| Schema changes | Versioned SQL migrations (drizzle-kit), committed | `push` / manual edits | Reproducible, reviewable, same DB for every developer |
+| Exclusion constraint | Hand-written custom SQL migration | Hoping ORM supports it / app-only check | Drizzle can't express EXCLUDE; DB-level guarantee is the whole point. Trade-off: not visible in schema.ts, documented instead |
+| Extension | CREATE EXTENSION btree_gist in migration | Manual setup | Fresh DB works with `db:migrate` alone |
+| DB connection | Single pg Pool cached on globalThis in dev | New pool per import | Next.js dev reloads would exhaust connections |
+| Seed | Wipe-and-refill with TRUNCATE, relative dates, refuses in production | Fixed dates / append-only | Idempotent; demo always has future bookings; cannot wipe prod |
+| Seed shortcuts (known) | Fake password hash, hard-coded +05:30 offset | Real hashing / tz library now | Both replaced later (Phase 7 and Phase 4). Documented honestly |
+| Proof of safety | SQL experiments + two-terminal race test (automated test in Phase 4) | "Trust me" | Evidence for reviewers |
