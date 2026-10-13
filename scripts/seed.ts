@@ -1,6 +1,12 @@
+
 import { sql } from "drizzle-orm";
 import { db, pool } from "../src/lib/db/client";
 import { reservations, resources, users } from "../src/lib/db/schema";
+import {
+  addDaysYmd,
+  colomboInstant,
+  todayInColombo,
+} from "../src/lib/time/zone";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Refusing to seed: this script wipes all data.");
@@ -8,19 +14,10 @@ if (process.env.NODE_ENV === "production") {
 
 const PLACEHOLDER_HASH = "not-a-real-hash";
 
-const todayInColombo = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Colombo",
-}).format(new Date());
+const today = todayInColombo();
 
-function addDays(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function at(dayOffset: number, time: string): Date {
-  return new Date(`${addDays(todayInColombo, dayOffset)}T${time}:00+05:30`);
-}
+const at = (dayOffset: number, time: string) =>
+  colomboInstant(addDaysYmd(today, dayOffset), time);
 
 function must<T>(value: T | undefined, label: string): T {
   if (value === undefined) throw new Error(`Seed error: missing ${label}`);
@@ -117,3 +114,4 @@ main()
     process.exitCode = 1;
   })
   .finally(() => pool.end());
+
