@@ -1,3 +1,24 @@
+# DECISIONS
+## Phase 0 additions: edge cases
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| Editing a reservation (BR11) | Same overlap rule, excluding itself | Skip check on edit | Edits must never create overlaps; self-overlap must not block the edit |
+| Ended / in-progress bookings (BR12) | Ended = read-only; in progress = start locked, end editable, cancel allowed | Allow all edits anytime | History must stay trustworthy. Trade-off: cancel of in-progress booking hides real usage from stats |
+| Midnight crossing (BR13) | One range of instants, clipped per day in the UI | Date + two times model | Ranges map directly to tstzrange and make overlap math simple |
+| Cancel/rebook race (BR14) | Rely on DB constraint, no app locks | Row locks / check-then-insert | Check-then-insert has a race window; the constraint is atomic. Cancel is idempotent |
+| Deactivated users (BR15) | Deactivate, keep future bookings, flag for admin | Hard delete or auto-cancel | Same principle as resources: never destroy history silently |
+
+## Phase 1: Setup and tooling
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| ORM | Drizzle | Prisma | SQL stays visible; clean raw-SQL migrations for the exclusion constraint. Trade-off: smaller ecosystem |
+| Database runtime | Docker Compose, postgres:16-alpine | Local install, `latest` tag | Same setup for every developer; pinned major version |
+| Styling | Tailwind CSS | Plain CSS | Fast, consistent design tokens |
+| Folder structure | app / components / lib {validation, domain, services, db, time} | Logic inside routes/components | Testable pure domain logic; clear dependency direction |
+| Git workflow | Short branches, PRs to main, squash merge, Conventional Commits | Direct pushes to main | Clean, reviewable history |
+| CI | GitHub Actions: lint + typecheck now, tests in Phase 4 | No CI | Automatic proof of quality on every push |
+| Secrets | `.env` ignored, `.env.example` committed | Committing real values | Never commit secrets |
+
 ## Phase 2: Database Design
 
 | Decision                      | Chosen                                                                                                                                                              | Rejected                                          | Why                                                                                                                                                                               |
@@ -23,3 +44,18 @@
 | Seed | Wipe-and-refill with TRUNCATE, relative dates, refuses in production | Fixed dates / append-only | Idempotent; demo always has future bookings; cannot wipe prod |
 | Seed shortcuts (known) | Fake password hash, hard-coded +05:30 offset | Real hashing / tz library now | Both replaced later (Phase 7 and Phase 4). Documented honestly |
 | Proof of safety | SQL experiments + two-terminal race test (automated test in Phase 4) | "Trust me" | Evidence for reviewers |
+## Phase 4: Domain, validation, service, tests
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| Where rules live | Pure functions in lib/domain, no DB/clock access | Logic in routes/components | Unit-testable in milliseconds; one source of truth |
+| Current time | Passed in as `now` | `new Date()` inside rules | Deterministic tests |
+| Validation | One Zod schema factory shared by client and server, calling domain rules | Separate client/server checks | Same rules everywhere; server still re-validates (never trust the browser) |
+| Time zones | Luxon, all conversion in lib/time/zone.ts, store UTC | Hard-coded +05:30, native Date only | Correct "start of day" logic; one place to change. Trade-off: extra dependency |
+| Conflict handling | Try insert, translate PG error 23P01 into friendly CONFLICT with holder info | Check-then-insert | Pre-check has a race window and still needs the catch. DB is the single judge |
+| Error style | Return result objects for expected failures, throw for unexpected | Exceptions for everything | Conflicts are normal business outcomes |
+| Error detection | Walk the `cause` chain for the SQLSTATE code | Check `error.code` only | ORM may wrap the driver error |
+| Audit write | Reservation + event in one transaction | Two separate writes | All-or-nothing consistency |
+| Test DB | Separate `slotline_test`, migrations run in test setup | Reuse dev DB / mocks | Tests wipe tables; real DB needed for concurrency proof |
+| Concurrency proof | 20 simultaneous requests via service, plus 20 raw inserts bypassing the app | Single test or mocks | Shows both layers: app handles it, DB guarantees it |
+| CI | Postgres service container, runs full test suite | Unit tests only | Visible, repeatable proof on every push |
+| Known gap | In-progress booking edits need to skip the past-start check | Ignore | Handled in Phase 6 (BR12) |
