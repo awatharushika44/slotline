@@ -59,3 +59,16 @@
 | Concurrency proof | 20 simultaneous requests via service, plus 20 raw inserts bypassing the app | Single test or mocks | Shows both layers: app handles it, DB guarantees it |
 | CI | Postgres service container, runs full test suite | Unit tests only | Visible, repeatable proof on every push |
 | Known gap | In-progress booking edits need to skip the past-start check | Ignore | Handled in Phase 6 (BR12) |
+## Phase 4.5: Design system
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| Visual concept | Departures board + ribbon timeline | Generic table/calendar look | Matches the question "what is free, when, who has it?" and reads in 3 seconds |
+| Palette | Warm paper, deep indigo ink, one signal green | Many bright colors / default framework theme | One accent keeps "free" instantly recognizable. Text pairs checked by hand at 5:1 or better (verify with a contrast checker before submitting) |
+| Not color alone | Shape + text (● FREE / ■ BUSY), hatching and strikethrough for cancelled | Color-only status | WCAG: color-blind users and grayscale printing still work |
+| Fonts | Bricolage Grotesque (display), Geist (UI), Geist Mono (times) via next/font | Google Fonts link / one font | Character in headings, readability in forms, tabular numbers so times align. next/font self-hosts, no layout shift |
+| Styling approach | Plain CSS variables (tokens) + small class set | UI kit / heavy animation library | Light, fully understood, easy to explain. Trade-off: more hand-written CSS |
+| Motion | CSS only, 3 durations, one ease-out, honors prefers-reduced-motion | JS animation library | No dependencies; accessible |
+| Flip animation | key-based remount replays a CSS animation | Animation library | Tiny; teaches how React keys work |
+| Touch targets | Controls at least 44px tall | Compact controls | Usable on phones |
+| Accessibility basics | Skip link, visible focus ring, labelled inputs with aria-describedby, aria-live on status | Add later | Cheaper to build in now than to retrofit |
+| Dark mode | Not now | Build now | Cut order: only if time remains |

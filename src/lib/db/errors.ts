@@ -14,3 +14,8 @@ export function getPgErrorCode(error: unknown): string | undefined {
 export function isExclusionViolation(error: unknown): boolean {
   return getPgErrorCode(error) === EXCLUSION_VIOLATION;
 }
+const UNIQUE_VIOLATION = "23505";
+
+export function isUniqueViolation(error: unknown): boolean {
+  return getPgErrorCode(error) === UNIQUE_VIOLATION;
+}

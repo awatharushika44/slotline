@@ -1,11 +1,11 @@
 import { isExclusionViolation } from "@/lib/db/errors";
 import {
-  getResourceById,
   insertReservationWithEvent,
   listActiveInRange,
   type ConflictingReservation,
   type Reservation,
 } from "@/lib/db/reservation-repo";
+import { getResourceById } from "@/lib/db/resource-repo";
 import type { ReservationInput } from "@/lib/validation/reservation";
 
 export type ReservationError =
@@ -23,9 +23,11 @@ export async function createReservation(
   actorId: string,
 ): Promise<CreateReservationResult> {
   const resource = await getResourceById(input.resourceId);
+
   if (!resource) {
     return { ok: false, error: { code: "RESOURCE_NOT_FOUND" } };
   }
+
   if (!resource.isActive) {
     return { ok: false, error: { code: "RESOURCE_INACTIVE" } };
   }
@@ -42,15 +44,18 @@ export async function createReservation(
       },
       actorId,
     );
+
     return { ok: true, reservation };
   } catch (error) {
     if (!isExclusionViolation(error)) {
       throw error;
     }
+
     const conflicts = await listActiveInRange(input.resourceId, {
       start: input.startsAt,
       end: input.endsAt,
     });
+
     return { ok: false, error: { code: "CONFLICT", conflicts } };
   }
 }
