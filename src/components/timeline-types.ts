@@ -13,6 +13,7 @@ export interface TimelineBlock {
   widthPct: number;
   canEdit: boolean;
   canCancel: boolean;
+  canViewHistory: boolean;
   startLocked: boolean;
 }
 
