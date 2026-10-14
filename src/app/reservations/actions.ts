@@ -18,6 +18,8 @@ import { formatDayLabel, formatRange } from "@/lib/time/format";
 import { colomboLocalToInstant, ymdInColombo } from "@/lib/time/zone";
 import { isUuid } from "@/lib/validation/ids";
 import { makeReservationInputSchema, reservationUpdateSchema } from "@/lib/validation/reservation";
+import { getReservationHistory, type HistoryResult } from "@/lib/services/audit-service";
+
 
 const text = (data: FormData, key: string) => String(data.get(key) ?? "").trim();
 const FIELD_NAMES: Record<string, string> = { startsAt: "startsAtLocal", endsAt: "endsAtLocal" };
@@ -142,4 +144,9 @@ export async function restoreReservationAction(id: string): Promise<SimpleResult
   }
   revalidateAll();
   return { ok: true };
+}
+
+export async function getHistoryAction(id: string): Promise<HistoryResult> {
+  if (!isUuid(id)) return { ok: false, message: "Unknown reservation." };
+  return getReservationHistory(id, await getCurrentUser());
 }

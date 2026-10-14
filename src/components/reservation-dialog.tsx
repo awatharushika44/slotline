@@ -2,6 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { CancelReservationButton } from "./cancel-reservation-button";
+import { HistoryPanel } from "./history-panel";
 import { ReservationForm } from "./reservation-form";
 import type { TimelineBlock } from "./timeline-types";
 
@@ -20,12 +21,23 @@ export function ReservationDialog({ state, onChange, bookableResources }: Props)
   const close = () => onChange(null);
 
   return (
-    <Dialog.Root open={state !== null} onOpenChange={(open) => { if (!open) close(); }}>
+    <Dialog.Root
+      open={state !== null}
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
         <Dialog.Content className="dialog">
           <Dialog.Close asChild>
-            <button type="button" className="btn btn--ghost btn--small dialog-close" aria-label="Close">✕</button>
+            <button
+              type="button"
+              className="btn btn--ghost btn--small dialog-close"
+              aria-label="Close"
+            >
+              ✕
+            </button>
           </Dialog.Close>
 
           {state?.kind === "create" && (
@@ -37,7 +49,13 @@ export function ReservationDialog({ state, onChange, bookableResources }: Props)
               <ReservationForm
                 mode="create"
                 resources={bookableResources}
-                initial={{ resourceId: state.resourceId, title: "", notes: "", startsAtLocal: state.startsAtLocal, endsAtLocal: state.endsAtLocal }}
+                initial={{
+                  resourceId: state.resourceId,
+                  title: "",
+                  notes: "",
+                  startsAtLocal: state.startsAtLocal,
+                  endsAtLocal: state.endsAtLocal,
+                }}
                 onSuccess={close}
               />
             </>
@@ -49,27 +67,50 @@ export function ReservationDialog({ state, onChange, bookableResources }: Props)
               <Dialog.Description className="muted">
                 {state.resourceName} · <span className="mono">{state.block.timeLabel}</span>
               </Dialog.Description>
-              <p>Booked by <strong>{state.block.holderName}{state.block.mine ? " (you)" : ""}</strong></p>
+              <p>
+                Booked by{" "}
+                <strong>
+                  {state.block.holderName}
+                  {state.block.mine ? " (you)" : ""}
+                </strong>
+              </p>
               {state.block.notes && <p>{state.block.notes}</p>}
               {state.block.canEdit || state.block.canCancel ? (
                 <div className="dialog-actions">
                   {state.block.canEdit && (
-                    <button type="button" className="btn btn--primary" onClick={() => onChange({ kind: "edit", block: state.block, resourceName: state.resourceName })}>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() =>
+                        onChange({
+                          kind: "edit",
+                          block: state.block,
+                          resourceName: state.resourceName,
+                        })
+                      }
+                    >
                       Edit
                     </button>
                   )}
-                  {state.block.canCancel && <CancelReservationButton reservationId={state.block.id} onDone={close} />}
+                  {state.block.canCancel && (
+                    <CancelReservationButton reservationId={state.block.id} onDone={close} />
+                  )}
                 </div>
               ) : (
-                <p className="muted">Read-only: you can only change your own upcoming or ongoing bookings.</p>
+                <p className="muted">
+                  Read-only: you can only change your own upcoming or ongoing bookings.
+                </p>
               )}
+              {state.block.canViewHistory && <HistoryPanel reservationId={state.block.id} />}
             </>
           )}
 
           {state?.kind === "edit" && (
             <>
               <Dialog.Title>Edit booking</Dialog.Title>
-              <Dialog.Description className="muted">Changes are checked against every other booking.</Dialog.Description>
+              <Dialog.Description className="muted">
+                Changes are checked against every other booking.
+              </Dialog.Description>
               <ReservationForm
                 mode="edit"
                 resources={bookableResources}

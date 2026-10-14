@@ -3,6 +3,7 @@ import { DayNav } from "@/components/day-nav";
 import { Timeline } from "@/components/timeline";
 import type { TimelineRow } from "@/components/timeline-types";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { isAdmin } from "@/lib/domain/actor";
 import { ceilToGrid } from "@/lib/domain/find-slots";
 import { CATEGORY_LABELS } from "@/lib/domain/resource-categories";
 import { getReservationPermissions } from "@/lib/domain/reservation-policy";
@@ -15,7 +16,11 @@ import { instantToColomboLocal, isValidYmd, todayInColombo } from "@/lib/time/zo
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Timeline" };
 
-export default async function TimelinePage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+export default async function TimelinePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
   const { date } = await searchParams;
   const now = new Date();
   const today = todayInColombo(now);
@@ -53,6 +58,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
             ...placement,
             canEdit: permissions.canEdit,
             canCancel: permissions.canCancel,
+            canViewHistory: r.userId === me.id || isAdmin(me),
             startLocked: permissions.startLocked,
           },
         ];
@@ -64,7 +70,9 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
   const pastPct = Math.min(Math.max(nowFraction, 0), 1) * 100;
   // 5 minutes of headroom, so the suggested start is not already "in the past" when submitted
   const suggestedStartLocal =
-    ymd === today ? instantToColomboLocal(ceilToGrid(new Date(now.getTime() + 5 * 60_000))) : `${ymd}T09:00`;
+    ymd === today
+      ? instantToColomboLocal(ceilToGrid(new Date(now.getTime() + 5 * 60_000)))
+      : `${ymd}T09:00`;
 
   return (
     <div className="page">
@@ -84,12 +92,15 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
         nowPct={nowPct}
         pastPct={pastPct}
         rows={rows}
-        bookableResources={view.resources.filter((r) => r.isActive).map((r) => ({ id: r.id, name: r.name }))}
+        bookableResources={view.resources
+          .filter((r) => r.isActive)
+          .map((r) => ({ id: r.id, name: r.name }))}
         suggestedStartLocal={suggestedStartLocal}
       />
 
       <p className="muted">
-        Click free time on a row, or use the Book button. Back-to-back bookings are allowed. Your own bookings have a green underline.
+        Click free time on a row, or use the Book button. Back-to-back bookings are allowed. Your
+        own bookings have a green underline.
       </p>
     </div>
   );
