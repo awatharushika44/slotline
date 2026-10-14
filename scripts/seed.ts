@@ -1,23 +1,19 @@
-
 import { sql } from "drizzle-orm";
+import { DEMO_PASSWORD } from "../src/lib/auth/demo";
+import { hashPassword } from "../src/lib/auth/password";
 import { db, pool } from "../src/lib/db/client";
-import { reservations, resources, users } from "../src/lib/db/schema";
-import {
-  addDaysYmd,
-  colomboInstant,
-  todayInColombo,
-} from "../src/lib/time/zone";
+import { reservationEvents, reservations, resources, users } from "../src/lib/db/schema";
+import { addDaysYmd, colomboInstant, todayInColombo } from "../src/lib/time/zone";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Refusing to seed: this script wipes all data.");
 }
 
-const PLACEHOLDER_HASH = "not-a-real-hash";
-
 const today = todayInColombo();
+const at = (dayOffset: number, time: string) => colomboInstant(addDaysYmd(today, dayOffset), time);
 
-const at = (dayOffset: number, time: string) =>
-  colomboInstant(addDaysYmd(today, dayOffset), time);
+// Each user gets its own random salt, so the hashes all differ.
+const hash = () => hashPassword(DEMO_PASSWORD);
 
 function must<T>(value: T | undefined, label: string): T {
   if (value === undefined) throw new Error(`Seed error: missing ${label}`);
@@ -32,11 +28,11 @@ async function main() {
   const userRows = await db
     .insert(users)
     .values([
-      { email: "amaya@slotline.test", name: "Amaya Fernando", role: "admin", passwordHash: PLACEHOLDER_HASH },
-      { email: "kasun@slotline.test", name: "Kasun Silva", passwordHash: PLACEHOLDER_HASH },
-      { email: "dilini@slotline.test", name: "Dilini Jayawardena", passwordHash: PLACEHOLDER_HASH },
-      { email: "ruwan@slotline.test", name: "Ruwan Perera", passwordHash: PLACEHOLDER_HASH },
-      { email: "sachini@slotline.test", name: "Sachini Wickramasinghe", passwordHash: PLACEHOLDER_HASH },
+      { email: "amaya@slotline.test", name: "Amaya Fernando", role: "admin", passwordHash: await hash() },
+      { email: "kasun@slotline.test", name: "Kasun Silva", passwordHash: await hash() },
+      { email: "dilini@slotline.test", name: "Dilini Jayawardena", passwordHash: await hash() },
+      { email: "ruwan@slotline.test", name: "Ruwan Perera", passwordHash: await hash() },
+      { email: "sachini@slotline.test", name: "Sachini Wickramasinghe", passwordHash: await hash() },
     ])
     .returning();
 
@@ -54,9 +50,7 @@ async function main() {
     ])
     .returning();
 
-  const userByKey = new Map(
-    userRows.map((u) => [u.email.split("@")[0], u] as const),
-  );
+  const userByKey = new Map(userRows.map((u) => [u.email.split("@")[0], u] as const));
   const resourceByName = new Map(resourceRows.map((r) => [r.name, r] as const));
 
   function booking(
@@ -77,7 +71,8 @@ async function main() {
     };
   }
 
-  await db.insert(reservations).values([
+  // Hand-picked bookings: they tell a story for the demo.
+  const handPicked = [
     booking("Old Annex Hall", "amaya", "Quarterly town hall", at(-3, "10:00"), at(-3, "12:00")),
 
     booking("Boardroom A", "amaya", "Weekly planning", at(0, "09:00"), at(0, "10:00")),
@@ -103,9 +98,65 @@ async function main() {
     booking("Company Van", "dilini", "Airport pickup (overnight)", at(1, "22:00"), at(2, "02:00")),
 
     booking("Pool Car", "sachini", "Bank run", at(0, "12:00"), at(0, "13:00")),
-  ]);
+  ];
 
-  console.log(`Seeded ${userRows.length} users, ${resourceRows.length} resources.`);
+  // Deterministic pseudo-random history (same data every run), so insights look real.
+  function lcg(seed: number) {
+    let s = seed;
+    return () => {
+      s = (s * 1664525 + 1013904223) % 4294967296;
+      return s / 4294967296;
+    };
+  }
+  const rand = lcg(42);
+  const pick = <T>(items: readonly T[]): T => items[Math.floor(rand() * items.length)] as T;
+  const hhmm = (minutes: number) =>
+    `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  const people = ["amaya", "kasun", "dilini", "ruwan", "sachini"] as const;
+  const topics = ["Team sync", "Client call", "Workshop", "Interview", "Planning", "Training", "Site visit"] as const;
+
+  const history: (typeof reservations.$inferInsert)[] = [];
+  for (let day = -21; day <= -1; day++) {
+    for (const resource of resourceRows.filter((r) => r.isActive)) {
+      let cursor = 8 * 60;
+      while (cursor < 17 * 60) {
+        if (rand() < 0.4) {
+          const length = pick([30, 60, 60, 90, 120]);
+          history.push(
+            booking(resource.name, pick(people), pick(topics), at(day, hhmm(cursor)), at(day, hhmm(cursor + length))),
+          );
+          cursor += length; // next booking starts later, so history never overlaps itself
+        }
+        cursor += 30;
+      }
+    }
+  }
+
+  const inserted = await db.insert(reservations).values([...handPicked, ...history]).returning();
+
+  await db.insert(reservationEvents).values(
+    inserted.flatMap((r) => {
+      const events: (typeof reservationEvents.$inferInsert)[] = [
+        {
+          reservationId: r.id,
+          actorId: r.userId,
+          eventType: "created",
+          details: { after: { resourceId: r.resourceId, title: r.title, startsAt: r.startsAt, endsAt: r.endsAt } },
+        },
+      ];
+      if (r.status === "cancelled") {
+        events.push({
+          reservationId: r.id,
+          actorId: r.userId,
+          eventType: "cancelled",
+          details: { before: { status: "active" }, after: { status: "cancelled" } },
+        });
+      }
+      return events;
+    }),
+  );
+
+  console.log(`Seeded ${userRows.length} users, ${resourceRows.length} resources, ${inserted.length} reservations.`);
 }
 
 main()
@@ -114,4 +165,3 @@ main()
     process.exitCode = 1;
   })
   .finally(() => pool.end());
-
