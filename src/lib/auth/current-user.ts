@@ -1,36 +1,28 @@
-import { and, eq } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
-import { db } from "@/lib/db/client";
-import { users } from "@/lib/db/schema";
+import { getActiveUserById } from "@/lib/db/user-repo";
 import type { Actor } from "@/lib/domain/actor";
 import { isUuid } from "@/lib/validation/ids";
-
-export const DEMO_USER_COOKIE = "slotline_demo_user";
+import { readSessionToken, SESSION_COOKIE } from "./session";
 
 export interface CurrentUser extends Actor {
   name: string;
   email: string;
 }
 
-const columns = { id: users.id, name: users.name, email: users.email, role: users.role };
-
-/** `cache` makes layout and page share one lookup per request. */
-export const getCurrentUser = cache(async (): Promise<CurrentUser> => {
-  const wanted = (await cookies()).get(DEMO_USER_COOKIE)?.value;
-  if (wanted && isUuid(wanted)) {
-    const [found] = await db
-      .select(columns)
-      .from(users)
-      .where(and(eq(users.id, wanted), eq(users.isActive, true)))
-      .limit(1);
-    if (found) return found;
-  }
-  const [admin] = await db
-    .select(columns)
-    .from(users)
-    .where(and(eq(users.role, "admin"), eq(users.isActive, true)))
-    .limit(1);
-  if (!admin) throw new Error("No users found. Run `npm run db:seed` first.");
-  return admin;
+/** The signed-in user, or null. `cache` = one lookup per request. Used by the layout. */
+export const getSessionUser = cache(async (): Promise<CurrentUser | null> => {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const userId = readSessionToken(token);
+  if (!userId || !isUuid(userId)) return null;
+  return (await getActiveUserById(userId)) ?? null;
 });
+
+/** For pages and actions that need a user: no session means redirect to /login. */
+export async function getCurrentUser(): Promise<CurrentUser> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  return user;
+}
