@@ -6,6 +6,7 @@ import { WORKDAY_END, WORKDAY_START } from "@/lib/domain/working-hours";
 import { addDaysYmd, colomboInstant, dayRangeUtc, todayInColombo } from "@/lib/time/zone";
 
 const HEADROOM_MS = 5 * 60_000; // a suggested start must not already be "past" when the user clicks
+const PER_DAY_LIMIT = 1000; // finite on purpose: findNextSlots only accepts integers, and a day never has this many slots
 
 export interface FoundSlot extends Slot {
   resourceName: string;
@@ -25,7 +26,10 @@ export async function findSlots(options: {
 
   const today = todayInColombo(now);
   const horizon = dayRangeUtc(addDaysYmd(today, days)).start;
-  const busy = await listBusyForResources(resources.map((r) => r.id), { start: now, end: horizon });
+  const busy = await listBusyForResources(
+    resources.map((r) => r.id),
+    { start: now, end: horizon },
+  );
   const earliest = new Date(now.getTime() + HEADROOM_MS);
 
   const found: Slot[] = [];
@@ -42,7 +46,7 @@ export async function findSlots(options: {
         durationMinutes,
         from,
         until: close,
-        limit: Number.POSITIVE_INFINITY,
+        limit: PER_DAY_LIMIT,
       }),
     );
   }
