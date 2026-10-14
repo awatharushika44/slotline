@@ -87,3 +87,16 @@
 | Archived resources | Shown (greyed) when they hold bookings that day | Hide them | Never make existing bookings invisible |
 | Drag to create | Cut (click + Book button instead) | Build drag | Time risk; keyboard path matters more |
 | Race on cancel | UPDATE ... WHERE status = 'active' | Read then write | Two cancels cannot both succeed |
+## Phase 7: Auth, Find me a slot, filters
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| Password storage | scrypt (Node crypto) + per-user salt, constant-time compare | Plain/SHA-256 hash, bcrypt dependency | Slow, salted, no extra dependency |
+| Session | HMAC-signed cookie (userId.expiry.signature), httpOnly, 8 h | DB sessions table / JWT library | Simple and verifiable. Trade-off: no server-side revoke (deactivated users are still blocked by an is_active check on every request) |
+| Login errors | One generic message, dummy hash for unknown email | "Email not found" | No user enumeration, similar timing |
+| Route protection | getCurrentUser() redirects, called in every data page and action | Middleware | Node crypto is not available in edge middleware. Known gap: a new page that forgets the call is public (improvement: route-group layout guard) |
+| Demo accounts | Buttons shown only if SHOW_DEMO_ACCOUNTS=true | Always on / never | Reviewers can try roles in one click; password not shipped otherwise |
+| Slot search | Reuses findNextSlots per day inside 08:00-18:00 | New algorithm | One tested function for three features; no 3 AM suggestions |
+| Slot booking | Same saveReservationAction as chips | Separate endpoint | One write path, one set of rules |
+| Filters | GET params, server-side validated, members scoped in the service | Client-side filtering | Shareable URLs; cannot be bypassed by editing the URL |
+| Pagination | LIMIT/OFFSET with one extra row to detect next page | Count query, keyset | Simple, fine at this scale. Keyset would scale better |
+| LIKE search | Escape % and _ | Raw interpolation | Users cannot inject wildcards |
