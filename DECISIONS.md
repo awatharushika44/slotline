@@ -72,3 +72,18 @@
 | Touch targets | Controls at least 44px tall | Compact controls | Usable on phones |
 | Accessibility basics | Skip link, visible focus ring, labelled inputs with aria-describedby, aria-live on status | Add later | Cheaper to build in now than to retrofit |
 | Dark mode | Not now | Build now | Cut order: only if time remains |
+## Phase 6: Reservations and screens
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| BR12 | One pure getReservationPermissions used by UI and service | Separate checks in each | UI and server can never disagree |
+| Ongoing booking | Start locked, end editable (finish early allowed) | Fully locked | Matches reality; frees the slot |
+| Window rules on edit | validateBookingWindow(existingStart) in the service | Zod with past-start check | The rule depends on the stored row |
+| Conflict UX | Try the write, translate 23P01, return holder + suggestions | Pre-check availability | No race window; one judge |
+| Suggestions | findNextSlots twice: same time on other resources, next free here | Only same-resource | Fixes the "fewer than 3 slots" limit from Phase 4.5 |
+| Chips | Submit exact slot through the same action | Fill the form and ask again | One click; server still validates |
+| Undo | Real restore through the constraint | Hide the cancel | Honest: can fail if the slot was taken |
+| Date inputs | datetime-local interpreted as Colombo | Separate date + time fields | Handles overnight bookings; one field each |
+| Timeline layout | Percent-based blocks from a pure function, 24 h scroll | Pixel maths in the component | Testable; nothing hidden outside the viewport |
+| Archived resources | Shown (greyed) when they hold bookings that day | Hide them | Never make existing bookings invisible |
+| Drag to create | Cut (click + Book button instead) | Build drag | Time risk; keyboard path matters more |
+| Race on cancel | UPDATE ... WHERE status = 'active' | Read then write | Two cancels cannot both succeed |
