@@ -1,4 +1,8 @@
-import { listActiveForRange, listReservationsForList } from "@/lib/db/reservation-repo";
+import {
+  listActiveForRange,
+  listReservationsForList,
+  type ReservationListFilters,
+} from "@/lib/db/reservation-repo";
 import { listResources, type Resource } from "@/lib/db/resource-repo";
 import { isAdmin, type Actor } from "@/lib/domain/actor";
 import { getResourceStatus, type ResourceStatus } from "@/lib/domain/resource-status";
@@ -19,7 +23,10 @@ export async function getBoard(now: Date): Promise<BoardRow[]> {
   ]);
   return resources.map((resource) => ({
     resource,
-    status: getResourceStatus(booked.filter((b) => b.resourceId === resource.id), now),
+    status: getResourceStatus(
+      booked.filter((b) => b.resourceId === resource.id),
+      now,
+    ),
   }));
 }
 
@@ -31,10 +38,17 @@ export async function getDayView(ymd: string) {
     listActiveForRange(range),
   ]);
   const withBookings = new Set(reservations.map((r) => r.resourceId));
-  return { range, reservations, resources: resources.filter((r) => r.isActive || withBookings.has(r.id)) };
+  return {
+    range,
+    reservations,
+    resources: resources.filter((r) => r.isActive || withBookings.has(r.id)),
+  };
 }
 
-/** Members see their own reservations, admins see all (BR8). */
-export function getReservationList(actor: Actor, mode: "upcoming" | "past", now: Date) {
-  return listReservationsForList({ userId: isAdmin(actor) ? undefined : actor.id, mode, now, limit: 50 });
+/** Members are always scoped to themselves (BR8), whatever the filters say. Admins can filter by person. */
+export function getReservationList(actor: Actor, filters: ReservationListFilters, now: Date) {
+  return listReservationsForList(
+    { ...filters, userId: isAdmin(actor) ? filters.userId : actor.id },
+    now,
+  );
 }
