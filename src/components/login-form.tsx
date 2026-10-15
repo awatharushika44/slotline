@@ -5,9 +5,17 @@ import { loginAction, type LoginState } from "@/app/login/actions";
 import { Field, fieldProps } from "./field";
 
 interface Demo {
-  accounts: { email: string; label: string }[];
+  accounts: { email: string; name: string; role: string }[];
   password: string;
 }
+
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
 export function LoginForm({ demo }: { demo: Demo | null }) {
   const [state, formAction, pending] = useActionState(loginAction, {} as LoginState);
@@ -24,25 +32,65 @@ export function LoginForm({ demo }: { demo: Demo | null }) {
 
   return (
     <>
-      <form ref={formRef} action={formAction} className="card form-card">
-        {state.message && <p role="alert" className="error">⚠ {state.message}</p>}
+      <form ref={formRef} action={formAction} className="auth-form">
+        {state.message && (
+          <p role="alert" className="error auth-error">
+            ⚠ {state.message}
+          </p>
+        )}
         <Field name="email" label="Email">
-          <input {...fieldProps("email")} ref={emailRef} type="email" autoComplete="username" defaultValue={state.email} required />
+          <input
+            {...fieldProps("email")}
+            ref={emailRef}
+            type="email"
+            autoComplete="username"
+            defaultValue={state.email}
+            placeholder="you@company.com"
+            required
+          />
         </Field>
         <Field name="password" label="Password">
-          <input {...fieldProps("password")} ref={passwordRef} type="password" autoComplete="current-password" required />
+          <input
+            {...fieldProps("password")}
+            ref={passwordRef}
+            type="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            required
+          />
         </Field>
-        <button className="btn btn--primary" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
+        <button className="btn btn--primary auth-submit" disabled={pending}>
+          {pending ? "Signing in…" : "Sign in"}
+        </button>
       </form>
 
       {demo && (
-        <section className="demo-logins" aria-label="Demo accounts">
-          <p className="muted">Demo accounts for reviewers (password <span className="mono">{demo.password}</span>):</p>
-          {demo.accounts.map((a) => (
-            <button key={a.email} type="button" className="btn btn--ghost" onClick={() => signInAs(a.email, demo.password)}>
-              Sign in as {a.label}
-            </button>
-          ))}
+        <section className="auth-demo" aria-label="Demo accounts">
+          <p className="auth-divider">
+            <span>or try a demo account</span>
+          </p>
+          <div className="auth-chips">
+            {demo.accounts.map((a) => (
+              <button
+                key={a.email}
+                type="button"
+                className="demo-chip"
+                disabled={pending}
+                onClick={() => signInAs(a.email, demo.password)}
+              >
+                <span className="demo-avatar" aria-hidden="true">
+                  {initials(a.name)}
+                </span>
+                <span className="demo-text">
+                  <strong>{a.name}</strong>
+                  <span className="muted">{a.role}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="muted auth-pass">
+            Password for all demos: <span className="mono">{demo.password}</span>
+          </p>
         </section>
       )}
     </>

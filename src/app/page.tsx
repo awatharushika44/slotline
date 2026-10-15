@@ -18,9 +18,14 @@ export default async function HomePage() {
   return (
     <div className="page">
       <AutoRefresh seconds={30} />
-      <header className="section">
+      <header className="section hero">
+        <div className="floaters" aria-hidden="true">
+          <span className="floater" />
+          <span className="floater" />
+          <span className="floater" />
+        </div>
         <p className="mono muted">
-          {formatDayLabel(todayInColombo(now))} · {formatTime(now)}
+          <span className="live">LIVE</span> · {formatDayLabel(todayInColombo(now))} · {formatTime(now)}
         </p>
         <h1>What is free right now?</h1>
         <p>
@@ -32,6 +37,9 @@ export default async function HomePage() {
       <p>
         <Link className="btn btn--primary" href="/timeline">
           Open today’s timeline
+        </Link>{" "}
+        <Link className="btn btn--ghost" href="/find">
+          Find me a slot
         </Link>
       </p>
     </div>

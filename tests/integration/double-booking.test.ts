@@ -1,5 +1,5 @@
 
-import "./setup-env"; // Must stay first: configure the TEST database before importing the DB client.
+import "./setup-env"; 
 
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
