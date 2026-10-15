@@ -8,8 +8,7 @@ Built for the PrimeWave Lab Software Engineering Internship technical assessment
 
 ![Departures board](docs/board.png)
 
-- 🎥 **Demo video:** YOUR-VIDEO-LINK
-- 🗺️ **ER diagram:** YOUR-ER-LINK
+
 
 ## Run it in 5 commands
 
